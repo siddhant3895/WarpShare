@@ -8,7 +8,7 @@ console = Console()
 
 EXACT_SECRETS = {
     ".env",
-    ".npmrc",  # Fixed typo from .nprc
+    ".npmrc",  # there was a typo from .nprc right in this line
     ".yarnrc",
     ".pypirc",
     ".netrc",
@@ -23,7 +23,7 @@ EXACT_SECRETS = {
     "database.yml",
     "service-account.json",
     "gcloud.json",
-    "azureprofile.json",  # Lowercase for case-insensitive matching
+    "azureprofile.json",  # lowercased it
 }
 
 WILDCARD_SECRETS = (
@@ -42,7 +42,6 @@ def confirm_to_share_secrets_in_cwd(path: str) -> None:
     base_path = Path(path)
     is_asked = False
 
-    # Use rglob("*") to catch secrets in subdirectories too
     for file_path in base_path.rglob("*"):
         if not file_path.is_file():
             continue
@@ -50,7 +49,6 @@ def confirm_to_share_secrets_in_cwd(path: str) -> None:
         name_lower = file_path.name.lower()
         rel_path = str(file_path.relative_to(base_path))
 
-        # Combine checks with 'or' / 'elif' so a file is never prompted twice
         is_exact = name_lower in EXACT_SECRETS
         is_wildcard = any(fnmatch.fnmatchcase(name_lower, pattern) for pattern in WILDCARD_SECRETS)
 
@@ -71,7 +69,7 @@ def ask(filename: str, is_asked: bool) -> None:
     console.print("\nAre you sure you want to share it with the receiver? (y/N)", end=" ")
     
     value: str = click.getchar().lower()
-    console.print(value)  # Echo the character so the user sees their input
+    console.print(value)  # echo the character so that the user is actually able to see their input
 
     if value != "y":
         console.print("[bold red]Aborted sharing.[/bold red]")
