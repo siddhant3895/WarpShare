@@ -1,75 +1,78 @@
 import fnmatch
-import click, sys
-from rich.console import Console
+import sys
+import click
 from pathlib import Path
+from rich.console import Console
 
 console = Console()
 
-EXACT_SECRETS = (
-   ".env",
-   ".nprc",
-   ".yarnrc",
-   ".pypirc",
-   ".netrc",
-   ".git-credentials",
-   "id_rsa",
-   "id_ed25519",
-   "authorized_keys",
-   "secrets.yaml",
-   "terraform.tfvars",
-   "wp-config.php",
-   "database.yml",
-   "service-account.json",
-   "gcloud.json",
-   "azureProfile.json",
-)
+EXACT_SECRETS = {
+    ".env",
+    ".npmrc",  # Fixed typo from .nprc
+    ".yarnrc",
+    ".pypirc",
+    ".netrc",
+    ".git-credentials",
+    "id_rsa",
+    "id_ed25519",
+    "authorized_keys",
+    "secrets.yaml",
+    "secrets.yml",
+    "terraform.tfvars",
+    "wp-config.php",
+    "database.yml",
+    "service-account.json",
+    "gcloud.json",
+    "azureprofile.json",  # Lowercase for case-insensitive matching
+}
 
 WILDCARD_SECRETS = (
-   "*.pem",
-   "*.key",
-   "*.p12",
-   "*.pfx",
-   "*.crt",
-   "*.cer",
-   "*.keystore",
-   ".env.*",
+    "*.pem",
+    "*.key",
+    "*.p12",
+    "*.pfx",
+    "*.crt",
+    "*.cer",
+    "*.keystore",
+    ".env.*",
 )
 
 
 def confirm_to_share_secrets_in_cwd(path: str) -> None:
-   path = Path(path)
-   is_asked = False
+    base_path = Path(path)
+    is_asked = False
 
-   # 2. Iterate through files in the directory
-   for file_path in path.iterdir():
-      if file_path.is_file():
-         name = file_path.name
-      else:
-         continue
+    # Use rglob("*") to catch secrets in subdirectories too
+    for file_path in base_path.rglob("*"):
+        if not file_path.is_file():
+            continue
 
-      # Check exact match
-      if name in EXACT_SECRETS:
-         ask(name, is_asked)
-         is_asked = True
+        name_lower = file_path.name.lower()
+        rel_path = str(file_path.relative_to(base_path))
 
-      # Check wildcard match
-      if any(fnmatch.fnmatch(name, pattern) for pattern in WILDCARD_SECRETS):
-         ask(name, is_asked)
-         is_asked = True
+        # Combine checks with 'or' / 'elif' so a file is never prompted twice
+        is_exact = name_lower in EXACT_SECRETS
+        is_wildcard = any(fnmatch.fnmatchcase(name_lower, pattern) for pattern in WILDCARD_SECRETS)
+
+        if is_exact or is_wildcard:
+            ask(rel_path, is_asked)
+            is_asked = True
 
 
 def ask(filename: str, is_asked: bool) -> None:
-   if not is_asked:
-      console.print(f"\n[bold yellow][Warning][/bold yellow] This file may contain secrets, credentials, or private keys.")
-   else:
-      print()
+    if not is_asked:
+        console.print(
+            "\n[bold yellow][Warning][/bold yellow] This directory contains files that may hold secrets, credentials, or private keys."
+        )
+    else:
+        print()
 
-   console.print(f"[bold red][File][/bold red] {filename}")
-   console.print("\nAre you sure to share it with the receiver? (y/N)", end=" ")
-   value: str = click.getchar().lower()
+    console.print(f"[bold red][File][/bold red] {filename}")
+    console.print("\nAre you sure you want to share it with the receiver? (y/N)", end=" ")
+    
+    value: str = click.getchar().lower()
+    console.print(value)  # Echo the character so the user sees their input
 
-   print()
-
-   if value != "y":
-      sys.exit()
-   return
+    if value != "y":
+        console.print("[bold red]Aborted sharing.[/bold red]")
+        sys.exit(1)
